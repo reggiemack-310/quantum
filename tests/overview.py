@@ -93,12 +93,14 @@ class TestSimulator(unittest.TestCase):
         row       = account.getRowForTimestamp(timestamp)
 
         self.assertEqual(row[EQUITY], 1126541)
-        self.assertEqual(row[DAYRET], -0.0021895230612933598)
+        self.assertEqual(row[DAYRET], -0.0021895230612933858)
 
-        self.assertEqual(sim.account.calcAverageDailyReturn(), 0.0044872245702950817)
-        self.assertEqual(sim.account.calcTotalReturn(),        0.13254099999999999)
-        self.assertEqual(sim.account.calcVolatility() ,        0.063231565605421008)
-        self.assertEqual(sim.account.calcSharpeRatio(),        1.1265335763454476)
+        self.assertEqual(sim.account.calcAverageDailyReturn(), 0.00051897060204111271)
+        self.assertEqual(sim.account.calcTotalReturn(),        1.132541)
+        self.assertEqual(sim.account.calcVolatility() ,        0.0070599415378012212)
+        self.assertEqual(sim.account.calcSharpeRatio(),        1.16692225571762)
+
+        print sim.getAccount().to_string(showHistory=True)
 
     def testEventProfiler(self):
 
@@ -124,7 +126,7 @@ class TestSimulator(unittest.TestCase):
         self.assertEqual(df_eventHistory['AAPL'].iloc[121], 1)
 
 
-        orders = profiler.generateOrders(100, dt.timedelta(days=5))
+        orders = profiler.generateOrders(100, 5)
         self.assertEqual(len(orders), 1008)
 
         str  = orders.to_string()

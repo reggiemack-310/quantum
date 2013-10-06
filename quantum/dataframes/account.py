@@ -21,7 +21,7 @@ class Account(TimeSeriesDf):
 
     def build(self):
 
-        cols = [MARKET, BALANCE, EQUITY, PROFIT, DAYRET]
+        cols = [SHARES, MARKET, BALANCE, EQUITY, PROFIT, DAYRET]
 
         r = len(self.window.getTimestamps())
         c = len(cols)
@@ -40,9 +40,10 @@ class Account(TimeSeriesDf):
 
             self.history.iloc[actual][BALANCE] = self.history.iloc[prev][BALANCE]
 
-    def updateAccountAt(self, index, marketValue):
+    def updateAccountAt(self, index, marketValue, shares):
         # The order is important
         self.updateMarketValueAt(index, marketValue)
+        self.updateSharesAt(index, shares)
         self.calcEquityAt(index)
         self.calcProfitAt(index)
         self.calcDailyReturnAt(index)
@@ -54,15 +55,19 @@ class Account(TimeSeriesDf):
         row = self.history.iloc[index]
         row[EQUITY] = row[BALANCE] + row[MARKET]
 
+    def updateSharesAt(self, index, shares):
+        row = self.history.iloc[index]
+        row[SHARES] = shares
+
     def calcProfitAt(self, index):
         row = self.history.iloc[index]
         # TODO: Review calculation method
-        row[PROFIT] = row[EQUITY] / self.history.iloc[0][BALANCE] * 100
+        row[PROFIT] = row[EQUITY] / self.history.iloc[0][BALANCE]
 
     def calcDailyReturnAt(self, index):
 
         row = self.history.iloc[index]
-        if index == 0: row[DAYRET] = 1
+        if index == 0: row[DAYRET] = 0
         else:
             actual = index
             prev   = index - 1
@@ -70,28 +75,32 @@ class Account(TimeSeriesDf):
             actualRow = self.history.iloc[actual]
             prevRow   = self.history.iloc[prev]
 
-            actualRow[DAYRET] = (actualRow[EQUITY] - prevRow[EQUITY]) / prevRow[EQUITY]
+            actualRow[DAYRET] = (actualRow[PROFIT] - prevRow[PROFIT]) / prevRow[PROFIT]
+
+    def getNonZeroReturns(self):
+
+        rows = self.history
+        return rows[rows[SHARES] > 0][DAYRET]
 
     def calcSharpeRatio(self, riskFreeInterest = 0, tradingInterval = 252):
 
         if self.volatility is None:
             self.calcVolatility()
 
-        if self.volatility is None:
+        if self.averageDailyReturn is None:
             self.calcAverageDailyReturn()
 
-
-        self.sharpeRatio = ((self.averageDailyReturn * tradingInterval - riskFreeInterest) /
-                       (self.volatility * np.sqrt(tradingInterval)))
+        self.sharpeRatio = (self.averageDailyReturn * tradingInterval - riskFreeInterest) / (self.volatility * np.sqrt(tradingInterval))
 
         return self.sharpeRatio
 
+
     def calcVolatility(self):
-        self.volatility = np.std(self.history[DAYRET])
+        self.volatility = np.std(self.history[DAYRET], axis=0)
         return self.volatility
 
     def calcAverageDailyReturn(self):
-        self.averageDailyReturn = np.mean(self.history[DAYRET])
+        self.averageDailyReturn = np.mean(self.history[DAYRET], axis=0)
         return self.averageDailyReturn
 
     def calcTotalReturn(self):
@@ -101,8 +110,30 @@ class Account(TimeSeriesDf):
 
         equity = self.history[EQUITY]
 
-        self.totalReturn =  (equity.iloc[z] - equity.iloc[a]) / equity.iloc[a]
+        self.totalReturn =  equity.iloc[z] / equity.iloc[a]
         return self.totalReturn
+
+    def calculateAccountPerformance(self):
+        self.calcAverageDailyReturn()
+        self.calcTotalReturn()
+        self.calcVolatility()
+        self.calcSharpeRatio()
+
+    def to_string(self, showHistory = False):
+
+        log = ""
+
+        self.calculateAccountPerformance()
+
+        if showHistory is True:
+            log = log + '\n' + super(Account, self).__str__()
+            print "-----------------------"
+
+        log = log + '\n' + 'Sharpe Ratio - %5.5f ' % (self.sharpeRatio)
+        log = log + '\n' + 'Average Daily Return - %5.5f ' % (self.averageDailyReturn)
+        log = log + '\n' + 'Volatility - %5.5f ' % (self.volatility)
+        log = log + '\n' + 'Total Return - %5.5f ' % (self.totalReturn)
+        return log
 
 
 

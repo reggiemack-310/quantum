@@ -4,14 +4,8 @@ import pandas   as pd
 import numpy    as np
 import datetime as dt
 
-from quantum.constants import *
-
-from quantum.providers.dataProvider import DataProvider
-
-from quantum.panels.price      import PricePanel
-from quantum.panels.trade      import TradePanel
-from quantum.dataframes.account import Account
-from quantum.dataframes.order   import OrderDf
+from quantum.constants    import *
+from quantum.panels.trade import TradePanel
 
 class Simulator:
 
@@ -88,6 +82,13 @@ class Simulator:
 
             self.account.rollOverBalanceAt(i)
 
+            # TODO: This need rethinking
+            # These lines affect the trading results!
+            marketValue = self.trades.getMarketValueAt(i)
+            shares      = self.trades.getSharesAt(i)
+
+            self.account.updateAccountAt(i, marketValue, shares)
+
             for symbol in self.getSymbols():
 
                 bid = self.prices.getRowForSymbolAtIndex(symbol, i)[ADJ_CLOSE]
@@ -96,7 +97,9 @@ class Simulator:
             self.processOrdersAtTimestamp(timestamp)
 
             marketValue = self.trades.getMarketValueAt(i)
-            self.account.updateAccountAt(i, marketValue)
+            shares      = self.trades.getSharesAt(i)
+
+            self.account.updateAccountAt(i, marketValue, shares)
 
             i = i + 1
 
@@ -123,7 +126,9 @@ class Simulator:
 
         if orderType is BUY:
             account[BALANCE] = account[BALANCE] - value
+            account[SHARES]  = account[SHARES]  + shares
 
         if orderType is SELL:
             account[BALANCE] = account[BALANCE] + value
+            account[SHARES]  = account[SHARES]  - shares
 

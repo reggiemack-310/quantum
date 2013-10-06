@@ -28,7 +28,7 @@ class TradePanel(TimeSeriesPanel):
 
     def updatePositionForSymbolAt(self, symbol, index, bid):
 
-         if index is not 0:
+        if index is not 0:
 
             actual = index
             prev   = actual - 1
@@ -48,6 +48,15 @@ class TradePanel(TimeSeriesPanel):
             marketValue = marketValue + self.getRowForSymbolAtIndex(symbol, index)[CAPITAL]
 
         return marketValue
+
+    def getSharesAt(self, index):
+
+        shares = 0
+        for symbol in self.window.getSymbols():
+
+            shares = shares + self.getRowForSymbolAtIndex(symbol, index)[SHARES]
+
+        return shares
 
     def __len__(self):
 

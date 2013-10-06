@@ -85,6 +85,8 @@ class EventProfiler:
         timestamps = self.getTimestamps()
         symbols    = self.getSymbols()
 
+        l = len(timestamps)
+
         for symbol in symbols:
 
             i = 0
@@ -96,13 +98,12 @@ class EventProfiler:
 
                     buyDate  = timestamp
 
-                    # TODO Correct this using a correct hold period
-                    periodsRemaining = len(timestamps) - (i+1)
-                    if periodsRemaining < 5:
+                    periodsRemaining = l - (i+1)
+                    if periodsRemaining < holdPeriod:
                         f = periodsRemaining
                     else:
-                        f = 5
-                    sellDate = timestamps[f]
+                        f = holdPeriod
+                    sellDate = timestamps[i+f]
 
                     orders.add(Order(symbol, buyDate,  'Buy' , shares))
                     orders.add(Order(symbol, sellDate, 'Sell', shares))
