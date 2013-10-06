@@ -1,37 +1,25 @@
-import QSTK.qstkutil.qsdateutil as du
-import QSTK.qstkutil.DataAccess as da
-import QSTK.qstkutil.tsutil     as tsu
 
-import matplotlib.pyplot as plt
-import pandas            as pd
-import numpy             as np
-import datetime          as dt
+import datetime as dt
 
-from enums.price      import P
-from enums.account    import AC
-from enums.timeSeries import TS
-from enums.orderType  import OT
-from enums.util       import T, DATE_FORMAT
-
-# Encapulate startDate, endDate, symbols and timestamps into dim object
-
-# Create symbol object
-
-# Create porfolio object
-
-# Add extra columns to contain extra calculation results
-# - sharpe, daily ret, vol, avg daily
+from quantum.constants  import *
 
 class MarketWindow():
 
-    def __init__(self, startDate, endDate, symbols):
+    def __init__(self, timeseries, symbols):
 
-        super().__init__()
+        self.timeseries = timeseries
+        self.symbols    = symbols
 
-        self.startDate  = None
-        self.endDate    = None        
-        self.timestamps = None            
+    def setTimeseries(self, timeseries):
+        self.timeseries = timeseries
+        return self
 
+    def setSymbols(self, symbols):
+        self.endDate = symbols
+        return self
 
+    def getTimestamps(self):
+        return self.timeseries.timestamps
 
-
+    def getSymbols(self):
+        return self.symbols

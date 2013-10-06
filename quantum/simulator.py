@@ -1,260 +1,129 @@
+import os
 
-import QSTK.qstkutil.qsdateutil as du
-import QSTK.qstkutil.DataAccess as da
-import QSTK.qstkutil.tsutil     as tsu
+import pandas   as pd
+import numpy    as np
+import datetime as dt
 
-import matplotlib.pyplot as plt
-import pandas            as pd
-import numpy             as np
-import datetime          as dt
+from quantum.constants import *
 
-from enums.price      import P
-from enums.account    import AC
-from enums.timeSeries import TS
-from enums.orderType  import OT
-from enums.util       import T, DATE_FORMAT
+from quantum.providers.dataProvider import DataProvider
 
-import dataProvider as DP
+from quantum.panels.price      import PricePanel
+from quantum.panels.trade      import TradePanel
+from quantum.dataframes.account import Account
+from quantum.dataframes.order   import OrderDf
 
-class Simulator:    
+class Simulator:
 
     def __init__(self):
 
-        self.reset()
-        
-    def reset(self):
+        self.window  = None
+        self.orders  = None
+        self.prices  = None
+        self.trades  = None
+        self.account = None
 
-        self.startDate   = None
-        self.endDate     = None
-        self.defaultTime = dt.time(16,0)        
-        
-        self.initialBalance = None
+    def config(self, account, marketWindow, orders, priceHistory):
 
-        self.ordersFileName  = None
-        self.historyFileName = None
+        self.window  = marketWindow
+        self.account = account
 
-        self.provider    = DP.DataProvider()
-
-        self.symbols     = None
-        self.timestamps  = None
-        self.bar         = [P.OPEN, P.HIGH, P.LOW, P.CLOSE, P.ADJ_CLOSE]
-
-        self.df_orderHistory   = None
-        self.wp_priceHistory   = None
-        self.wp_tradeHistory   = None
-        self.df_accountHistory = None
-
-        return self
-
-    def config(self, startDate, endDate, initialBalance, orderFilename='orders.csv', historyFilename='history.csv'):
-
-        self.startDate = startDate
-        self.endDate   = endDate
-
-        self.initialBalance = initialBalance
-
-        self.ordersFileName  = orderFilename
-        self.historyFileName = historyFilename
-
-        return self
-
-    def bootstrap(self):
-
-        self.getOrdersFromCsv()        
-        self.getOrderSymbols()
-        self.getMarketHistory()
-        self.initTradingHistoryPanel()
-        self.initAccountHistoryDataFrame()
+        self.orders  = orders
+        self.prices  = priceHistory
+        self.trades  = TradePanel(marketWindow)
 
         return self
 
     def run(self):
-        
-        self.simulateHistory()
-        self.calcAccountEquity()
-        self.calcAccountProfit()
 
+        self.simulateHistory()
         return self
 
-    # TODO Accept OrderListObject
-    def getOrdersFromCsv(self):
+    def getOrders(self):
+        return self.orders
 
-        f = open(self.ordersFileName)
-        content    = f.read()
-        orders     = content.split('\n')
-        timestamps = [] 
+    def getPrices(self):
+        return self.prices
 
-        for i in range(0,len(orders)):
-            bits = orders[i].split(',')
-                                    
-            if len(bits) is 0: continue
+    def getTrades(self):
+        return self.trades
 
-            timestamp = dt.date(int(bits[0]), int(bits[1]), int(bits[2]))
-            timestamp = dt.datetime.combine(timestamp, self.defaultTime)
-            timestamps.append(timestamp)
+    def getAccount(self):
+        return self.account
 
-            row = [bits[3], bits[4], bits[5]]            
-            orders[i] = row
+    def getSymbols(self):
+        return self.window.getSymbols()
 
-        timestamps = pd.to_datetime(timestamps)        
-    
-        df_orders = pd.DataFrame(orders, 
-            columns = [T.SYMBOL, T.ORDER_TYPE, T.SHARES],
-            index   = timestamps)
-        
-        ot = T.ORDER_TYPE
+    def getTimestamps(self):
+        return self.window.getTimestamps()
 
-        df_orders[ot][df_orders[ot] == 'Buy']  = OT.BUY
-        df_orders[ot][df_orders[ot] == 'Sell'] = OT.SELL
-
-        for i in range(0, len(df_orders)):
-            df_orders[T.SHARES][i] = int(df_orders[T.SHARES][i])
-
-        self.df_orderHistory = df_orders        
-
-    def getOrderSymbols(self):
-
-        self.symbols = list(set(self.df_orderHistory['symbol']))      
-        return self.symbols         
-
-    def getMarketHistory(self):
-    
-        self.wp_priceHistory = self.provider.forSymbols(self.symbols).since(self.startDate).until(self.endDate).get().asPanel()
-
-
-        self.timestamps = self.provider.getTimestamps()
-
-    def initTradingHistoryPanel(self):
-
-        cols = [T.SHARES, T.CAPITAL]
-
-        d = len(self.symbols)
-        r = len(self.timestamps)
-        c = len(cols)
-        
-        self.wp_tradeHistory = pd.Panel(np.zeros(shape=(d,r,c)),
-            items=self.symbols, minor_axis=cols, major_axis= self.timestamps)      
-
-    def initAccountHistoryDataFrame(self):
-
-        cols = [AC.MARKET, AC.BALANCE, AC.EQUITY, AC.PROFIT]
-        
-        r = len(self.timestamps)
-        c = len(cols)
-
-        self.df_accountHistory = pd.DataFrame(data = np.zeros((r,c)), index=self.timestamps, columns=cols)
-        self.df_accountHistory.iloc[0][AC.BALANCE] = self.initialBalance
-
-    def rollOverAccountHistory(self, pointer):
-
-        if pointer is not 0:
-            
-            actual = pointer
-            prev   = actual - 1
-
-            self.df_accountHistory.iloc[actual][T.BALANCE] = self.df_accountHistory.iloc[prev][T.BALANCE]
-
-    def rollOverSymbolHistory(self, symbol, pointer):
-
-        if pointer is not 0:
-
-            actual = pointer
-            prev   = actual - 1
-
-            symbolCurrentHist = self.wp_tradeHistory[symbol].iloc[actual]            
-            symbolPrevHist    = self.wp_tradeHistory[symbol].iloc[prev]
-            
-            symbolCurrentHist[T.SHARES] = symbolPrevHist[T.SHARES]
-
-            currentBar = self.wp_priceHistory[symbol].iloc[actual]
-            prevBar    = self.wp_priceHistory[symbol].iloc[prev]                
-            
-            symbolCurrentHist[T.CAPITAL] = symbolCurrentHist[T.SHARES] * currentBar[P.ADJ_CLOSE]
-
-    def rollOverSymbols(self, pointer):
-
-        for symbol in self.symbols:
-
-            self.rollOverSymbolHistory(symbol, pointer)
-
-
+    # Move to market class
     def processOrdersAtTimestamp(self, timestamp):
 
-        try:
-            
-            orders = self.df_orderHistory.loc[timestamp].copy()                            
+        orders = None
+
+        try: orders = self.orders.getRowForTimestamp(timestamp)
+        except: orders = False
+
+        if orders is not False:
+
             class_type = orders.__class__.__name__
 
-            if class_type is pd.Series.__name__:     
-                
+            if class_type is pd.Series.__name__:
+
                 self.processOrder(orders)
 
             elif class_type is pd.DataFrame.__name__:
-                
-                for order in orders.iterrows():                            
-                    
+
+                for order in orders.iterrows():
+
                     self.processOrder(order[1])
-
-        except: 
-
-            orders = None     
-
-    def calcAccountEquity(self):
-
-        account = self.df_accountHistory
-        account[AC.EQUITY] = account[AC.BALANCE] + account[AC.MARKET]
-
-    def calcAccountProfit(self):
-
-        account = self.df_accountHistory
-        account[AC.PROFIT] = account[AC.EQUITY] / account.iloc[0][AC.BALANCE] * 100
-
-    def calcAccountMarket(self, pointer):
-
-        account = self.df_accountHistory.iloc[pointer]
-
-        for symbol in self.symbols:
-
-            trade = self.wp_tradeHistory[symbol].iloc[pointer]
-            value = trade[T.SHARES] * self.wp_priceHistory[symbol].iloc[pointer][T.ADJ_CLOSE]
-            account[AC.MARKET] = account[AC.MARKET] + value
-
 
     def simulateHistory(self):
 
         i = 0
-        for timestamp in self.timestamps:
+        timestamps = self.getTimestamps()
 
-            self.rollOverAccountHistory(i)
-            self.rollOverSymbols(i)
+        for timestamp in timestamps:
 
-            self.processOrdersAtTimestamp(timestamp)                        
-            self.calcAccountMarket(i)
+            self.account.rollOverBalanceAt(i)
+
+            for symbol in self.getSymbols():
+
+                bid = self.prices.getRowForSymbolAtIndex(symbol, i)[ADJ_CLOSE]
+                self.trades.updatePositionForSymbolAt(symbol, i, bid)
+
+            self.processOrdersAtTimestamp(timestamp)
+
+            marketValue = self.trades.getMarketValueAt(i)
+            self.account.updateAccountAt(i, marketValue)
+
             i = i + 1
 
+    # Move to market class
     def processOrder(self, order):
-        
-        symbol    = order[T.SYMBOL]
-        shares    = order[T.SHARES]
+
         timestamp = order.name
+        orderType = order[ORDER_TYPE]
+        symbol    = order[SYMBOL]
+        shares    = order[SHARES]
 
-        orderType = order[T.ORDER_TYPE]
+        bar    = self.prices.getRowForSymbolAndTimestamp(symbol, timestamp)
+        price  = bar[ADJ_CLOSE]
 
-        price  = self.wp_priceHistory[symbol].loc[timestamp][P.ADJ_CLOSE]
         value  = shares * price
 
-        symbolRow = self.wp_tradeHistory[symbol].loc[timestamp]                    
-        account   = self.df_accountHistory.loc[timestamp]
-        
-        f = 1 if orderType is OT.BUY else -1 
-        
-        symbolRow[T.SHARES]  = symbolRow[T.SHARES]  + f * shares
-        symbolRow[T.CAPITAL] = symbolRow[T.CAPITAL] + f * value
+        trade   = self.trades.getRowForSymbolAndTimestamp(symbol, timestamp)
+        account = self.account.getRowForTimestamp(timestamp)
 
+        f = 1 if orderType is BUY else -1
 
-        if orderType is OT.BUY:
-            account[AC.BALANCE] = account[AC.BALANCE] - value            
-        
-        if orderType is OT.SELL:            
-            account[AC.BALANCE] = account[AC.BALANCE] + value
+        trade[SHARES]  = trade[SHARES]  + f * shares
+        trade[CAPITAL] = trade[CAPITAL] + f * value
+
+        if orderType is BUY:
+            account[BALANCE] = account[BALANCE] - value
+
+        if orderType is SELL:
+            account[BALANCE] = account[BALANCE] + value
 

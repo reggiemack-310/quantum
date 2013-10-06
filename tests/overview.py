@@ -1,89 +1,104 @@
 import unittest
-import simulator as S
 import datetime  as dt
-import eventProfiler as E
 
-from enums.price      import P
-from enums.account    import AC
-from enums.timeSeries import TS
-from enums.orderType  import OT 
-from enums.util       import T, DATE_FORMAT
+from quantum.profilers.eventProfiler import EventProfiler
+
+from quantum.simulator          import Simulator
+from quantum.panels.price       import PricePanel
+from quantum.panels.trade       import TradePanel
+from quantum.dataframes.account import Account
+from quantum.dataframes.order   import OrderDf
+
+from quantum.marketWindow import MarketWindow
+from quantum.timeseries   import TimeSeries
+
+from quantum.providers.yahoo import YahooProvider
+
+from quantum.constants import *
 
 class TestSimulator(unittest.TestCase):
 
     def setUp(self):
-        
-        pass
-
-    def blankSimulator(self):
-
-        sim = S.Simulator()
-        return sim
+        self.provider = YahooProvider()
 
     def defaultSimulator(self):
-        
+
         balance   = 1000000
         startDate = dt.date(2011,1,1)
         endDate   = dt.date(2011,12,31)
-        orderFilename   = 'orders.csv'
-        historyFilename = 'history.csv'
-        
-        sim = S.Simulator()
-        sim.config(startDate, endDate, balance, orderFilename, historyFilename)
+
+        orderFilename   = 'scratches/orders.csv'
+        historyFilename = 'scratches/history.csv'
+
+        orders = OrderDf()
+        orders.fetchFromCsv(orderFilename)
+
+        symbols = orders.extractSymbols()
+
+        series  = TimeSeries(startDate, endDate)
+        window  = MarketWindow(series, symbols)
+
+        account = Account(balance, window)
+        history = PricePanel(window, self.provider)
+
+        sim = Simulator()
+        sim.config(account, window, orders, history)
 
         return sim
+
+    def testOrders(self):
+
+        orderFilename = 'scratches/orders.csv'
+
+        orders = OrderDf()
+        orders.fetchFromCsv(orderFilename)
+
+        symbols = orders.extractSymbols()
+        self.assertEqual(len(symbols), 4)
+        self.assertEqual(len(orders) , 14)
+
+    def testPriceHistory(self):
+
+        startDate = dt.date(2011,1,1)
+        endDate   = dt.date(2011,12,31)
+        symbols   = ['GOOG']
+
+        series  = TimeSeries(startDate, endDate)
+        window  = MarketWindow(series, symbols)
+
+        history = PricePanel(window, self.provider)
+
+        self.assertEqual(len(history.getSymbols()), 1)
+        self.assertEqual(history.getRowForSymbolAtIndex('GOOG', 100)[HIGH] , 522.12)
 
     def testSimulatorBootstrap(self):
 
         sim = self.defaultSimulator()
-        sim.bootstrap()
 
-        self.assertEqual(len(sim.df_orderHistory), 14)
-        self.assertEqual(len(sim.symbols), 4)
-        self.assertEqual(len(sim.wp_priceHistory['GOOG'].index), 252)     
+        self.assertEqual(len(sim.getSymbols())   , 4)
+        self.assertEqual(len(sim.getOrders())    , 14)
+        self.assertEqual(len(sim.getTimestamps()), 252)
 
+    # According to HWK 4
     def testSimulatorPerformsTrades(self):
-        
+
         sim = self.defaultSimulator()
-        sim.bootstrap()
         sim.run()
 
-        googleTrades = sim.wp_tradeHistory['GOOG']
-        actualTrades = googleTrades.loc[googleTrades[T.SHARES] > 0]        
-
-        self.assertTrue(len(actualTrades) > 0)
-
-    # According to HWK 4    
-    def testSimulatorCalculatesEquity(self):
-
-        balance   = 1000000
-        startDate = dt.date(2011,1,1)
-        endDate   = dt.date(2011,12,31)
-        
-        orderFilename   = 'orders.csv'
-        historyFilename = 'history.csv'
-        
-        sim = self.blankSimulator()
-        sim.config(startDate, endDate, balance, orderFilename, historyFilename)
-        sim.bootstrap()
-        sim.run()
+        trades = sim.getTrades()
+        self.assertTrue(len(trades) > 0)
 
         timestamp = dt.datetime(2011,12,6,16,0)
-        equity    = sim.df_accountHistory.loc[timestamp][AC.EQUITY]
+        account   = sim.getAccount()
+        row       = account.getRowForTimestamp(timestamp)
 
-        self.assertEqual(equity, 1126541)
+        self.assertEqual(row[EQUITY], 1126541)
+        self.assertEqual(row[DAYRET], -0.0021895230612933598)
 
-
-    def testHowToAddSharesToHistory(self):
-
-        sim = self.defaultSimulator()
-        sim.bootstrap()
-        sim.run()
-
-        row = sim.wp_tradeHistory['GOOG'].loc[sim.timestamps[1]]        
-        row[T.SHARES] = 100
-
-        self.assertEqual(row[T.SHARES], 100)
+        self.assertEqual(sim.account.calcAverageDailyReturn(), 0.0044872245702950817)
+        self.assertEqual(sim.account.calcTotalReturn(),        0.13254099999999999)
+        self.assertEqual(sim.account.calcVolatility() ,        0.063231565605421008)
+        self.assertEqual(sim.account.calcSharpeRatio(),        1.1265335763454476)
 
     def testEventProfiler(self):
 
@@ -91,78 +106,30 @@ class TestSimulator(unittest.TestCase):
         endDate   = dt.date(2011,12,31)
         symbols   = ['AAPL', 'XOM']
 
-        profiler = E.EventProfiler()
-        profiler.config(startDate, endDate, symbols).fetchHistory()
+        series = TimeSeries(startDate, endDate)
+        window = MarketWindow(series, symbols)
 
-        def event(bar, prevbar, timestamp, index, symbol, panel, symbols, timestamps):
-            
-            return True            
+        history = PricePanel(window, self.provider)
+
+        def event(bar, prevbar, timestamp, index, symbol, timestamps):
+
+            return True
 
         ev = event
 
-        df_eventHistory = profiler.setEvent(ev).find()        
+        profiler = EventProfiler()
+        profiler.config(window, history, event)
+
+        df_eventHistory = profiler.find()
         self.assertEqual(df_eventHistory['AAPL'].iloc[121], 1)
-        
-        
-        orders = profiler.generateOrders(100, dt.timedelta(days=5))        
+
+
+        orders = profiler.generateOrders(100, dt.timedelta(days=5))
         self.assertEqual(len(orders), 1008)
 
         str  = orders.to_string()
-        bits = str.split(",")        
+        bits = str.split(",")
         self.assertEqual(len(bits), 5041)
-
-    # According to HWK 5
-    def testCustomEvent(self):
-        pass
-        import QSTK.qstkutil.DataAccess as da
-
-        balance   = 50000
-        startDate = dt.date(2008,1,1)
-        endDate   = dt.date(2009,12,31)
-
-        provider = da.DataAccess('Yahoo')
-        symbols  = provider.get_symbols_from_list('SP5002012')
-
-        shares     = 100
-        holdPeriod = dt.timedelta(days=5)
-
-        orderFilename   = 'ev_orders.csv'
-        historyFilename = 'ev_history.csv'
-
-        profiler = E.EventProfiler()
-        profiler.config(startDate, endDate, symbols).fetchHistory()
-
-        def event(bar, prevbar, timestamp, index, symbol, panel, symbols, timestamps):
-                        
-            if prevbar is not None:
-                    
-                res = bool((prevbar[P.ADJ_CLOSE] >= 8) and (bar[P.ADJ_CLOSE] < 8))
-                return res
-            
-            else:
-                return False
-
-        ev = event
-        df_eventHistory = profiler.setEvent(ev).find()        
-        # print df_eventHistory.to_string()    
-
-        orders = profiler.generateOrders(shares, holdPeriod)
-        
-        self.assertTrue(len(orders) > 0)
-
-        # print orders.to_string()
-        
-        f = open(orderFilename,'w')
-        f.write(orders.to_string())
-        f.close()
-        
-        sim = self.blankSimulator()
-        sim.config(startDate, endDate, balance, orderFilename, historyFilename)
-        sim.bootstrap()
-        sim.run()
-
-        print sim.df_accountHistory.to_string()
-
 
 if __name__ == '__main__':
     unittest.main()

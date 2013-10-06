@@ -2,6 +2,7 @@ from enum import Enum
 
 class DATE_FORMAT(Enum):
     DASHED = '%Y-%m-%d'
+    COMMAS = '%Y,%m,%d'
 
 class TERMS(Enum):
 
