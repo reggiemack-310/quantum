@@ -15,7 +15,7 @@ class DataProvider(object):
 
     def __init__(self):
 
-        self.bar = [OPEN, HIGH, LOW, CLOSE, ADJ_CLOSE]
+        self.bar = [OPEN, HIGH, LOW, CLOSE, ACTUAL_CLOSE]
         self.data = None
 
     def setMarketWindow(self, marketWindow):

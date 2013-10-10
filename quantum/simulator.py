@@ -16,6 +16,7 @@ class Simulator:
         self.prices  = None
         self.trades  = None
         self.account = None
+        self.bidBarPrice = CLOSE
 
     def config(self, account, marketWindow, orders, priceHistory):
 
@@ -26,6 +27,10 @@ class Simulator:
         self.prices  = priceHistory
         self.trades  = TradePanel(marketWindow)
 
+        return self
+
+    def setBidBarPrice(self, barPrice):
+        self.bidBarPrice = barPrice
         return self
 
     def run(self):
@@ -51,7 +56,7 @@ class Simulator:
     def getTimestamps(self):
         return self.window.getTimestamps()
 
-    # Move to market class
+    # Move to market class0
     def processOrdersAtTimestamp(self, timestamp):
 
         orders = None
@@ -75,33 +80,23 @@ class Simulator:
 
     def simulateHistory(self):
 
-        i = 0
         timestamps = self.getTimestamps()
 
-        for timestamp in timestamps:
+        for i in range(0, len(timestamps)):
 
             self.account.rollOverBalanceAt(i)
 
-            # TODO: This need rethinking
-            # These lines affect the trading results!
-            marketValue = self.trades.getMarketValueAt(i)
-            shares      = self.trades.getSharesAt(i)
-
-            self.account.updateAccountAt(i, marketValue, shares)
-
             for symbol in self.getSymbols():
 
-                bid = self.prices.getRowForSymbolAtIndex(symbol, i)[ADJ_CLOSE]
+                bid = self.prices.getRowForSymbolAtIndex(symbol, i)[self.bidBarPrice]
                 self.trades.updatePositionForSymbolAt(symbol, i, bid)
 
-            self.processOrdersAtTimestamp(timestamp)
+            self.processOrdersAtTimestamp(timestamps[i])
 
             marketValue = self.trades.getMarketValueAt(i)
             shares      = self.trades.getSharesAt(i)
 
             self.account.updateAccountAt(i, marketValue, shares)
-
-            i = i + 1
 
     # Move to market class
     def processOrder(self, order):
@@ -112,7 +107,7 @@ class Simulator:
         shares    = order[SHARES]
 
         bar    = self.prices.getRowForSymbolAndTimestamp(symbol, timestamp)
-        price  = bar[ADJ_CLOSE]
+        price  = bar[self.bidBarPrice]
 
         value  = shares * price
 

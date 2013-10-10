@@ -29,7 +29,7 @@ class OrderDf():
         orders     = content.split('\n')
         timestamps = []
 
-        for i in range(0,len(orders)):
+        for i in range(0, len(orders)):
             bits = orders[i].split(',')
 
             if len(bits) is 0: continue

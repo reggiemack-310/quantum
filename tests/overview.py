@@ -23,9 +23,10 @@ class TestSimulator(unittest.TestCase):
 
     def defaultSimulator(self):
 
+        # According to HWK 4 Example 1
         balance   = 1000000
-        startDate = dt.date(2011,1,1)
-        endDate   = dt.date(2011,12,31)
+        startDate = dt.date(2011,1,10)
+        endDate   = dt.date(2011,12,20)
 
         orderFilename   = 'scratches/orders.csv'
         historyFilename = 'scratches/history.csv'
@@ -43,7 +44,7 @@ class TestSimulator(unittest.TestCase):
 
         sim = Simulator()
         sim.config(account, window, orders, history)
-
+        sim.setBidBarPrice(ADJ_CLOSE)
         return sim
 
     def testOrders(self):
@@ -77,12 +78,13 @@ class TestSimulator(unittest.TestCase):
 
         self.assertEqual(len(sim.getSymbols())   , 4)
         self.assertEqual(len(sim.getOrders())    , 14)
-        self.assertEqual(len(sim.getTimestamps()), 252)
+        self.assertEqual(len(sim.getTimestamps()), 240)
 
     # According to HWK 4
     def testSimulatorPerformsTrades(self):
 
         sim = self.defaultSimulator()
+        sim.setBidBarPrice(CLOSE)
         sim.run()
 
         trades = sim.getTrades()
@@ -92,13 +94,13 @@ class TestSimulator(unittest.TestCase):
         account   = sim.getAccount()
         row       = account.getRowForTimestamp(timestamp)
 
-        self.assertEqual(row[EQUITY], 1126541)
-        self.assertEqual(row[DAYRET], -0.0021895230612933858)
+        self.assertEqual(row[EQUITY], 1127884.0)
+        self.assertEqual(row[DAYRET], -0.0021763286220832412)
 
-        self.assertEqual(sim.account.calcAverageDailyReturn(), 0.00051897060204111271)
-        self.assertEqual(sim.account.calcTotalReturn(),        1.132541)
-        self.assertEqual(sim.account.calcVolatility() ,        0.0070599415378012212)
-        self.assertEqual(sim.account.calcSharpeRatio(),        1.16692225571762)
+        self.assertEqual(sim.account.calcAverageDailyReturn(), 0.00054935274956903794)
+        self.assertEqual(sim.account.calcTotalReturn(),        1.1338600000000001)
+        self.assertEqual(sim.account.calcVolatility() ,        0.0071751451269905777)
+        self.assertEqual(sim.account.calcSharpeRatio(),        1.2154046211066654)
 
         print sim.getAccount().to_string(showHistory=True)
 

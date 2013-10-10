@@ -75,12 +75,13 @@ class Account(TimeSeriesDf):
             actualRow = self.history.iloc[actual]
             prevRow   = self.history.iloc[prev]
 
-            actualRow[DAYRET] = (actualRow[PROFIT] - prevRow[PROFIT]) / prevRow[PROFIT]
+            actualRow[DAYRET] = (actualRow[EQUITY] - prevRow[EQUITY]) / prevRow[EQUITY]
 
-    def getNonZeroReturns(self):
+    def getTrimmedTradingDays(self):
 
         rows = self.history
-        return rows[rows[SHARES] > 0][DAYRET]
+        return rows[DAYRET]
+        # return rows[rows[DAYRET] != 0][DAYRET]
 
     def calcSharpeRatio(self, riskFreeInterest = 0, tradingInterval = 252):
 
@@ -96,11 +97,11 @@ class Account(TimeSeriesDf):
 
 
     def calcVolatility(self):
-        self.volatility = np.std(self.history[DAYRET], axis=0)
+        self.volatility = np.std(self.getTrimmedTradingDays(), axis=0)
         return self.volatility
 
     def calcAverageDailyReturn(self):
-        self.averageDailyReturn = np.mean(self.history[DAYRET], axis=0)
+        self.averageDailyReturn = np.mean(self.getTrimmedTradingDays(), axis=0)
         return self.averageDailyReturn
 
     def calcTotalReturn(self):

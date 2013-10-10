@@ -16,10 +16,14 @@ OT         = ORDER_TYPE
 OPEN  = 'open'
 HIGH  = 'high'
 LOW   = 'low'
-CLOSE = 'close'
 
-ADJUSTED_CLOSE = 'actual_close'
+CLOSE = 'close'
+ADJUSTED_CLOSE = CLOSE
 ADJ_CLOSE      = ADJUSTED_CLOSE
+
+ACTUAL_CLOSE   = 'actual_close'
+
+IS_TRADE_PERIOD = 'trading period'
 
 BALANCE = 'balance'
 MARGIN  = 'margin'

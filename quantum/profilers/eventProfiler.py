@@ -40,6 +40,24 @@ class EventProfiler:
     def getSymbols(self):
         return self.window.getSymbols()
 
+    def __len__(self):
+
+        count   = 0
+        symbols = self.getSymbols()
+        timestamps = self.getTimestamps()
+
+        for symbol in symbols:
+
+            for i in range(0, len(timestamps)):
+
+                event = self.events[symbol].iloc[i]
+
+                if int(event) == int(1):
+
+                    count = count + 1
+
+        return count
+
     def find(self):
 
         timestamps = self.getTimestamps()
@@ -52,30 +70,24 @@ class EventProfiler:
         self.events = pd.DataFrame(data=np.zeros((r,c)),
             columns=symbols, index=timestamps)
 
+        # self.events = self.events * np.NAN
+
         for symbol in symbols:
 
-            i = 0
-            for timestamp in timestamps:
+            for i in range(1, len(timestamps)):
 
                 actual = i
-                prev   = i -1
+                prev   = i - 1
 
                 actualBar = self.prices.getRowForSymbolAtIndex(symbol, actual)
+                prevbar   = self.prices.getRowForSymbolAtIndex(symbol, prev)
+                result    = self.event(actualBar, prevbar, timestamps[i], i, symbol, self.prices)
 
-                if i > 0:
-                    prevbar = self.prices.getRowForSymbolAtIndex(symbol, prev)
-                else:
-                    prevbar = None
+                if bool(result) is True:
 
-                result = self.event(actualBar, prevbar, timestamp, i, symbol, self.prices)
+                    self.events[symbol].iloc[i] = 1
 
-                if result is True:
-
-                    self.events[symbol].loc[timestamp] = 1
-
-                i = i + 1
-
-        return self.events
+        return self
 
     # TODO: Return an order object
     def generateOrders(self, shares, holdPeriod):
@@ -89,14 +101,13 @@ class EventProfiler:
 
         for symbol in symbols:
 
-            i = 0
-            for timestamp in timestamps:
+            for i in range(0, len(timestamps)):
 
-                event = self.events[symbol].loc[timestamp]
+                event = self.events[symbol].iloc[i]
 
-                if event == 1:
+                if int(event) == int(1):
 
-                    buyDate  = timestamp
+                    buyDate = timestamps[i]
 
                     periodsRemaining = l - (i+1)
                     if periodsRemaining < holdPeriod:
@@ -108,7 +119,7 @@ class EventProfiler:
                     orders.add(Order(symbol, buyDate,  'Buy' , shares))
                     orders.add(Order(symbol, sellDate, 'Sell', shares))
 
-                i = i + 1
+        orders.sort()
 
         return orders
 

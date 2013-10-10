@@ -14,8 +14,13 @@ class OrderList:
     def add(self, order):
         self.orders.append(order)
 
+
+    def sort(self):
+
+        self.orders = sorted(self.orders, key=lambda order: order.timestamp)
+
     def to_string(self):
-        
+
         orders = []
         for order in self.orders:
 
@@ -32,26 +37,26 @@ class OrderList:
         f = open(self.ordersFileName)
         content    = f.read()
         orders     = content.split('\n')
-        timestamps = [] 
+        timestamps = []
 
         for i in range(0,len(orders)):
             bits = orders[i].split(',')
-                                    
+
             if len(bits) is 0: continue
 
             timestamp = dt.date(int(bits[0]), int(bits[1]), int(bits[2]))
             timestamp = dt.datetime.combine(timestamp, self.defaultTime)
             timestamps.append(timestamp)
 
-            row = [bits[3], bits[4], bits[5]]            
+            row = [bits[3], bits[4], bits[5]]
             orders[i] = row
 
-        timestamps = pd.to_datetime(timestamps)        
-    
-        df_orders = pd.DataFrame(orders, 
+        timestamps = pd.to_datetime(timestamps)
+
+        df_orders = pd.DataFrame(orders,
             columns = [T.SYMBOL, T.ORDER_TYPE, T.SHARES],
             index   = timestamps)
-        
+
         ot = T.ORDER_TYPE
 
         df_orders[ot][df_orders[ot] == 'Buy']  = OT.BUY
