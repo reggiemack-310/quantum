@@ -15,8 +15,8 @@ class DataProvider(object):
 
     def __init__(self):
 
-        self.bar = [OPEN, HIGH, LOW, CLOSE, ACTUAL_CLOSE]
-        self.data = None
+        self.data   = None
+        self.window = None
 
     def setMarketWindow(self, marketWindow):
 
@@ -25,9 +25,11 @@ class DataProvider(object):
 
     def asPanel(self):
 
-        priceHistory = dict(zip(self.bar, self.data))
+        bar = self.window.getBarPrices()
 
-        for key in self.bar:
+        priceHistory = dict(zip(bar, self.data))
+
+        for key in bar:
             priceHistory[key] = priceHistory[key].fillna(method='ffill')
             priceHistory[key] = priceHistory[key].fillna(method='bfill')
             priceHistory[key] = priceHistory[key].fillna(1.0)
@@ -38,7 +40,7 @@ class DataProvider(object):
 
         r = len(timestamps)
 
-        for price in self.bar:
+        for price in bar:
 
             for symbol in symbols:
 

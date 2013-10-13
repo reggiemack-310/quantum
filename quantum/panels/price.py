@@ -6,6 +6,9 @@ import datetime as dt
 from quantum.panels.base import TimeSeriesPanel
 from quantum.constants   import *
 
+# TODO: Add support for benchmark indexes
+# TODO: Add support for multiple timeframes
+# TODO: Rename to asset panel
 class PricePanel(TimeSeriesPanel):
 
     def __init__(self, marketWindow, provider):

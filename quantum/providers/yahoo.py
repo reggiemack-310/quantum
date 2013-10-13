@@ -23,5 +23,6 @@ class YahooProvider(DataProvider):
     def get(self):
 
         self.data = self.provider.get_data(self.window.getTimestamps(),
-                                           self.window.getSymbols(), self.bar)
+                                           self.window.getSymbols(),
+                                           self.window.getBarPrices())
         return self

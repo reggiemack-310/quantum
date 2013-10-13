@@ -14,67 +14,49 @@ class EventProfiler:
     def __init__(self):
 
         self.event  = None
-        self.window = None
 
         self.prices = None
         self.events = None
 
-        self.timestamps = None
+        self.initialOffset = None
 
-    def config(self, marketWindow, priceHistory, event):
+    def config(self, priceHistory, event, initialOffset = 1):
 
-        self.window = marketWindow
         self.prices = priceHistory
         self.event  = event
+        self.initialOffset = initialOffset
 
         return self
 
+    # TODO: Add support for multiple events
     def setEvent(self, ev):
 
         self.event = ev
         return self
 
-    def getTimestamps(self):
-        return self.window.getTimestamps()
-
-    def getSymbols(self):
-        return self.window.getSymbols()
-
     def __len__(self):
 
-        count   = 0
-        symbols = self.getSymbols()
-        timestamps = self.getTimestamps()
-
-        for symbol in symbols:
-
-            for i in range(0, len(timestamps)):
-
-                event = self.events[symbol].iloc[i]
-
-                if int(event) == int(1):
-
-                    count = count + 1
-
-        return count
+        series = self.events.sum(axis=0, skipna=True)
+        final  = series.sum(skipna=True)
+        return int(final)
 
     def find(self):
 
-        timestamps = self.getTimestamps()
-        symbols    = self.getSymbols()
+        timestamps = self.prices.getTimestamps()
+        symbols    = self.prices.getSymbols()
 
         r = len(timestamps)
         c = len(symbols)
 
         #TODO: Create a event class
-        self.events = pd.DataFrame(data=np.zeros((r,c)),
-            columns=symbols, index=timestamps)
+        values = np.empty((r,c))
+        values.fill(np.NAN)
 
-        # self.events = self.events * np.NAN
+        self.events = pd.DataFrame(data=values, columns=symbols, index=timestamps)
 
         for symbol in symbols:
 
-            for i in range(1, len(timestamps)):
+            for i in range(self.initialOffset, len(timestamps)):
 
                 actual = i
                 prev   = i - 1
@@ -94,8 +76,8 @@ class EventProfiler:
 
         orders = OrderList()
 
-        timestamps = self.getTimestamps()
-        symbols    = self.getSymbols()
+        timestamps = self.prices.getTimestamps()
+        symbols    = self.prices.getSymbols()
 
         l = len(timestamps)
 
@@ -105,7 +87,7 @@ class EventProfiler:
 
                 event = self.events[symbol].iloc[i]
 
-                if int(event) == int(1):
+                if event == 1:
 
                     buyDate = timestamps[i]
 
@@ -122,6 +104,83 @@ class EventProfiler:
         orders.sort()
 
         return orders
+
+    def count(self, i_lookback=20, i_lookforward=20, marketSymbol = 'SPY'):
+
+
+        del self.events[marketSymbol]
+        self.events.values[0:i_lookback, :]    = np.NAN
+        self.events.values[-i_lookforward:, :] = np.NAN
+        i_no_events = int(np.logical_not(np.isnan(self.events.values)).sum())
+        return i_no_events
+
+    # def profile(df_events_arg, d_data, i_lookback=20, i_lookforward=20,
+    #                 s_filename='study', b_market_neutral=True, b_errorbars=True,
+    #                 s_market_sym='SPY'):
+
+    #     ''' Event Profiler for an event matix'''
+    #     df_close = d_data['close'].copy()
+    #     df_rets = df_close.copy()
+
+    #     # Do not modify the original event dataframe.
+    #     df_events = df_events_arg.copy()
+    #     tsu.returnize0(df_rets.values)
+
+    #     if b_market_neutral == True:
+    #         df_rets = df_rets - df_rets[s_market_sym]
+    #         del df_rets[s_market_sym]
+    #         del df_events[s_market_sym]
+
+    #     df_close = df_close.reindex(columns=df_events.columns)
+
+    #     # Removing the starting and the end events
+    #     df_events.values[0:i_lookback, :] = np.NaN
+    #     df_events.values[-i_lookforward:, :] = np.NaN
+
+    #     # Number of events
+    #     i_no_events = int(np.logical_not(np.isnan(df_events.values)).sum())
+    #     assert i_no_events > 0, "Zero events in the event matrix"
+    #     na_event_rets = "False"
+
+    #     # Looking for the events and pushing them to a matrix
+    #     for i, s_sym in enumerate(df_events.columns):
+    #         for j, dt_date in enumerate(df_events.index):
+    #             if df_events[s_sym][dt_date] == 1:
+    #                 na_ret = df_rets[s_sym][j - i_lookback:j + 1 + i_lookforward]
+    #                 if type(na_event_rets) == type(""):
+    #                     na_event_rets = na_ret
+    #                 else:
+    #                     na_event_rets = np.vstack((na_event_rets, na_ret))
+
+    #     if len(na_event_rets.shape) == 1:
+    #         na_event_rets = np.expand_dims(na_event_rets, axis=0)
+
+    #     # Computing daily rets and retuns
+    #     na_event_rets = np.cumprod(na_event_rets + 1, axis=1)
+    #     na_event_rets = (na_event_rets.T / na_event_rets[:, i_lookback]).T
+
+    #     # Study Params
+    #     na_mean = np.mean(na_event_rets, axis=0)
+    #     na_std = np.std(na_event_rets, axis=0)
+    #     li_time = range(-i_lookback, i_lookforward + 1)
+
+    #     # Plotting the chart
+    #     plt.clf()
+    #     plt.axhline(y=1.0, xmin=-i_lookback, xmax=i_lookforward, color='k')
+    #     if b_errorbars == True:
+    #         plt.errorbar(li_time[i_lookback:], na_mean[i_lookback:],
+    #                     yerr=na_std[i_lookback:], ecolor='#AAAAFF',
+    #                     alpha=0.1)
+    #     plt.plot(li_time, na_mean, linewidth=3, label='mean', color='b')
+    #     plt.xlim(-i_lookback - 1, i_lookforward + 1)
+    #     if b_market_neutral == True:
+    #         plt.title('Market Relative mean return of ' +\
+    #                 str(i_no_events) + ' events')
+    #     else:
+    #         plt.title('Mean return of ' + str(i_no_events) + ' events')
+    #     plt.xlabel('Days')
+    #     plt.ylabel('Cumulative Returns')
+    #     plt.savefig(s_filename, format='pdf')
 
 
 

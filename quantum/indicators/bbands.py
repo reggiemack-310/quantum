@@ -7,7 +7,7 @@ from quantum.constants       import *
 
 class BollingerBands(Indicator):
 
-    def __init__(self, period=20, deviations=2, shift=0, applyTo=CLOSE):
+    def __init__(self, period=20, deviations=1, shift=0, applyTo=CLOSE):
 
         super(BollingerBands, self).__init__(applyTo)
 
@@ -19,18 +19,18 @@ class BollingerBands(Indicator):
         self.shift  = shift
 
         self.genProperties(['mean', 'upper', 'lower', 'value'])
+        # self.genProperties(['value'])
 
     def calc(self, priceDf):
-
-        result = None
 
         price  = priceDf[self.applyTo]
 
         mean   = pd.rolling_mean(price, self.period)
-        stddev = pd.rolling_std(price, self.period)
+        stddev = self.deviations * pd.rolling_std(price, self.period)
 
         upper = mean + stddev
         lower = mean - stddev
         value = (price - mean) / stddev
 
+        # return value
         return mean, upper, lower, value

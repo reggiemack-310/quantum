@@ -11,21 +11,18 @@ class Simulator:
 
     def __init__(self):
 
-        self.window  = None
         self.orders  = None
         self.prices  = None
         self.trades  = None
         self.account = None
         self.bidBarPrice = CLOSE
 
-    def config(self, account, marketWindow, orders, priceHistory):
+    def config(self, account, orders, prices):
 
-        self.window  = marketWindow
         self.account = account
-
         self.orders  = orders
-        self.prices  = priceHistory
-        self.trades  = TradePanel(marketWindow)
+        self.prices  = prices
+        self.trades  = TradePanel(prices.getWindow())
 
         return self
 
@@ -49,12 +46,6 @@ class Simulator:
 
     def getAccount(self):
         return self.account
-
-    def getSymbols(self):
-        return self.window.getSymbols()
-
-    def getTimestamps(self):
-        return self.window.getTimestamps()
 
     # Move to market class0
     def processOrdersAtTimestamp(self, timestamp):
@@ -80,13 +71,13 @@ class Simulator:
 
     def simulateHistory(self):
 
-        timestamps = self.getTimestamps()
+        timestamps = self.prices.getTimestamps()
 
         for i in range(0, len(timestamps)):
 
             self.account.rollOverBalanceAt(i)
 
-            for symbol in self.getSymbols():
+            for symbol in self.prices.getSymbols():
 
                 bid = self.prices.getRowForSymbolAtIndex(symbol, i)[self.bidBarPrice]
                 self.trades.updatePositionForSymbolAt(symbol, i, bid)

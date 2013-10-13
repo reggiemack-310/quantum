@@ -10,6 +10,9 @@ class TimeSeriesPanel(object):
 
         self.build()
 
+    def getWindow(self):
+        return self.window
+
     def getRowForSymbolAtIndex(self, symbol, index):
         return self.history[symbol].iloc[index]
 
